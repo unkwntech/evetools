@@ -177,7 +177,8 @@
 							owner.innerText = timer.defender_id;
 							
 							fetch(`https://esi.evetech.net/latest/alliances/${timer.defender_id}/`).then(async defenderRes => {
-								owner.innerHTML = JSON.parse(await defenderRes.text()).name + ` (<a href="https://zkillboard.com/alliance/${timer.defender_id}/" title="ZKill" target="_blank">z</a>)(<a href="https://evewho.com/alliance/${timer.defender_id}/" title="EveWho" target="_blank">w</a>)`;
+                                const allianceData = JSON.parse(await defenderRes.text());
+								owner.innerHTML = `[${allianceData.ticker}] ${allianceData.name} (<a href="https://zkillboard.com/alliance/${timer.defender_id}/" title="ZKill" target="_blank">z</a>)(<a href="https://evewho.com/alliance/${timer.defender_id}/" title="EveWho" target="_blank">w</a>)`;
 							});
 							
 							
