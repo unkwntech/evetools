@@ -1,0 +1,199 @@
+<html>
+	<head>
+		<title>Sov Timers</title>
+		<style>
+			body {
+				background-color: rgb(37, 37, 37);
+				color: rgb(206, 206, 206);
+			}
+			table {
+				border-collapse: collapse;
+				background-color: #222
+			}
+			table thead {
+				font-weight: bolder;
+				background-color: #444;
+				text-align: center;
+				font-size: 1.25em;
+			}
+			table td {
+				padding-right: 20;
+				padding-left: 20;
+				padding-top: 7;
+				padding-bottom: 7;
+			}
+			table tbody tr:hover {
+				background-color: #777
+			}
+			table tbody tr {
+				border-bottom: 1pt solid white;
+			}
+			a:link {
+				color: #CCF;
+				text-decoration: underline;
+			}
+			a:visited {
+				color: #CCF;
+				text-decoration: underline;
+			}
+			a:hover {
+				color: #CCF;
+				text-decoration: underline;
+			}
+			a:active {
+				color: #CCF;
+				text-decoration: underline;
+			}
+			
+			.winning {
+				color: #00FF00;
+			}
+			.losing {
+				color: #FF0000;
+			}
+			
+		</style>
+	</head>
+	<body>
+		<table>
+			<thead>
+				<tr>
+					<td class="type">Type</td>
+					<td class="system">System</td>
+					<td class="region">Region</td>
+					<td class="owner">Owner</td>
+					<td class="startTime">Start Time</td>
+					<td class="delta">Delta</td>
+					<td class="progress">Progress</td>
+				</tr>
+			</thead>
+			<tbody>
+			</tbody>
+		</table>
+			
+		<script type="text/javascript">
+		
+			function DeltaTime(start, end) {
+				delta = (start.getTime() - end.getTime()) / 1000;
+				const sign = delta>0?'+ ':'- ';
+				delta = Math.abs(delta);
+				
+				let days = Math.floor(delta / 86400);
+				if(days < 10) days = `0${days}`
+				
+				let hours = Math.floor((delta - (days * 86400)) / 3600);
+				if(hours < 10) hours = `0${hours}`
+				
+				let minutes = Math.floor((delta - (days * 86400) - (hours * 3600)) / 60);
+				if(minutes < 10) minutes = `0${minutes}`
+				
+				let seconds = Math.floor((delta - (days * 86400) - (hours * 3600) - (minutes * 60)));
+				if(seconds < 10) seconds = `0${seconds}`
+				
+				return `${sign}${days}:${hours}:${minutes}:${seconds}`;
+			}
+		
+			async function UpdateDeltas() {
+				const rows = document.getElementsByTagName("tbody")[0].getElementsByTagName("tr");
+				for(row of rows) {
+					const start = new Date(row.getElementsByClassName("startTime")[0].innerText);
+					row.getElementsByClassName("delta")[0].innerText = DeltaTime(start, new Date());
+				}
+			}
+			
+			setInterval(UpdateDeltas, 1000);
+		
+			async function UpdateTimers() {
+				fetch("https://esi.evetech.net/latest/sovereignty/campaigns/?datasource=tranquility").then(async response => {
+					if(response.status !== 200) {
+						console.error(`Response ${response.status} recieved`);
+					}
+					const data = JSON.parse(await response.text());
+					
+					data.sort((a, b) => {
+						return new Date(a.start_time).getTime() > new Date(b.start_time).getTime() ? 1 : -1
+					})
+					
+					for(const timer of data) {
+						const rowID = timer.solar_system_id + timer.event_type.split("_")[0];
+						
+						if(document.getElementById(rowID) === null){						
+							const row = document.createElement("tr");
+							row.setAttribute("id", `${rowID}`);
+							
+							const type = document.createElement("td");
+							type.setAttribute("class", 'type');
+							type.innerText = timer.event_type.split("_")[0];
+							
+							const system = document.createElement("td");
+							system.setAttribute("class", 'system');
+							system.innerText = timer.solar_system_id;
+							
+							const region = document.createElement("td");
+							region.setAttribute("class", 'region');
+							
+							fetch(`https://esi.evetech.net/latest/universe/systems/${timer.solar_system_id}/`).then(async systemRes => {
+								system.innerText = JSON.parse(await systemRes.text()).name;
+								fetch(`https://esi.evetech.net/latest/universe/constellations/${timer.constellation_id}/`).then(async constRes => {
+									fetch(`https://esi.evetech.net/latest/universe/regions/${JSON.parse(await constRes.text()).region_id}/`).then(async regionRes => {
+										region.innerText = JSON.parse(await regionRes.text()).name;
+									});
+								});
+							})
+							
+							const owner = document.createElement("td");
+							owner.setAttribute("class", 'defender');
+							owner.innerText = timer.defender_id;
+							
+							fetch(`https://esi.evetech.net/latest/alliances/${timer.defender_id}/`).then(async defenderRes => {
+								owner.innerHTML = JSON.parse(await defenderRes.text()).name + ` (<a href="https://zkillboard.com/alliance/${timer.defender_id}/" target="_blank">z</a>)(<a href="https://evewho.com/alliance/${timer.defender_id}/" target="_blank">w</a>)`;
+							});
+							
+							
+							const startTime = document.createElement("td");
+							startTime.setAttribute("class", 'startTime');
+							startTime.innerText = timer.start_time;
+							
+							const delta = document.createElement("td");
+							delta.setAttribute("class", 'delta');
+							delta.innerText = DeltaTime(new Date(timer.start_time), new Date())
+							
+							const progress = document.createElement("td");
+							progress.setAttribute("class", 'progress');
+							progress.innerText = parseInt(parseFloat(timer.defender_score) * 100) + "%";
+							if(parseFloat(timer.defender_score) > 0.6) {
+								progress.classList.add("winning")
+							} else if(parseFloat(timer.defender_score) > 0.6) {
+								progress.classList.add("losing")
+							}
+							
+							row.appendChild(type);
+							row.appendChild(system);
+							row.appendChild(region);
+							row.appendChild(owner);
+							row.appendChild(startTime);
+							row.appendChild(delta);
+							row.appendChild(progress);
+
+							
+							document.getElementsByTagName("tbody")[0].appendChild(row);
+						} else {
+							const row = document.getElementById(rowID);
+							const progress = row.getElementsByClassName("progress")[0];
+							progress.innerText = parseInt(parseFloat(timer.defender_score) * 100) + "%";
+							if(parseFloat(timer.defender_score) > 0.6) {
+								progress.classList.add("winning")
+							} else if(parseFloat(timer.defender_score) > 0.6) {
+								progress.classList.add("losing")
+							}
+						}
+						
+					}
+					
+				})
+			}
+			UpdateTimers();
+			setInterval(UpdateTimers, 10000);
+		</script>
+	</body>
+</html>
